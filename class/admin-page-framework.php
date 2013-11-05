@@ -1798,6 +1798,7 @@ abstract class AdminPageFramework_SettingsAPI extends AdminPageFramework_Menu {
 		'strHelp'			=> null,	// since 2.1.0
 		'strHelpAside'		=> null,	// since 2.1.0
 		'fRepeatable'		=> null,	// since 2.1.3
+		'fSortable'			=> null,	// since 2.1.3
 	);	
 	
 	/**
@@ -1824,6 +1825,14 @@ abstract class AdminPageFramework_SettingsAPI extends AdminPageFramework_Menu {
 	 * @internal
 	 */ 	
 	protected $fIsImageFieldScriptEnqueued = false;	
+	
+	/**
+	 * A flag that indicates whether the JavaScript script for sortable fields is added.
+	 * 
+	 * @since			2.1.3
+	 * @internal
+	 */
+	protected $fIsSortableScriptAdded = false;
 	
 	/**
 	 * A flag that indicates whether the JavaScript script for taxonomy checklist boxes.
@@ -2341,6 +2350,20 @@ abstract class AdminPageFramework_SettingsAPI extends AdminPageFramework_Menu {
 		// Append the script
 		$this->oProps->strScript .= AdminPageFramework_Properties::getImageSelectorScript( "admin_page_framework", $this->oProps->strThickBoxTitle, $this->oProps->strThickBoxButtonUseThis );
 		
+	}
+	
+	/**
+	 * 
+	 * @since			2.1.3
+	 */
+	private function addSortableField() {
+	
+		if ( $this->fIsSortableScriptAdded	) return;
+			$this->fIsSortableScriptAdded = true;
+	
+		// Append the script
+		$this->oProps->strScript .= AdminPageFramework_Properties::getSortableScript();
+
 	}
 	
 	/**
@@ -2924,6 +2947,7 @@ abstract class AdminPageFramework_SettingsAPI extends AdminPageFramework_Menu {
 			if ( $arrField['strType'] == 'image' && $arrField['strPageSlug'] == $strCurrentPageSlug ) $this->addImageFieldScript( $arrField );
 			if ( $arrField['strType'] == 'color' && $arrField['strPageSlug'] == $strCurrentPageSlug ) $this->enqueueColorFieldScript( $arrField );
 			if ( $arrField['strType'] == 'date' && $arrField['strPageSlug'] == $strCurrentPageSlug ) $this->enqueueDateFieldScript( $arrField );
+			if ( $arrField['fSortable'] && $arrField['strPageSlug'] == $strCurrentPageSlug ) $this->addSortableField();
 			
 			// For the contextual help pane,
 			if ( ! empty( $arrField['strHelp'] ) )
@@ -4261,7 +4285,34 @@ abstract class AdminPageFramework_Properties_Base {
 		.admin-page-framework-field-radio .admin-page-framework-field .admin-page-framework-input-container {
 			display: inline;
 		}
-		
+		/* Sortable Fields */
+		.sortable .admin-page-framework-field {
+			clear: both;
+			display: block;
+			padding: 1em 1em 0.5em;
+			margin-top: 1px;
+			border-top-width: 1px;
+			border-bottom-width: 1px;
+			border-bottom-style: solid;
+			-webkit-user-select: none;
+			-moz-user-select: none;
+			user-select: none;			
+			text-shadow: #fff 0 1px 0;
+			-webkit-box-shadow: 0 1px 0 #fff;
+			box-shadow: 0 1px 0 #fff;
+			-webkit-box-shadow: inset 0 1px 0 #fff;
+			box-shadow: inset 0 1px 0 #fff;
+			-webkit-border-radius: 3px;
+			border-radius: 3px;
+			background: #f1f1f1;
+			background-image: -webkit-gradient(linear, left bottom, left top, from(#ececec), to(#f9f9f9));
+			background-image: -webkit-linear-gradient(bottom, #ececec, #f9f9f9);
+			background-image:    -moz-linear-gradient(bottom, #ececec, #f9f9f9);
+			background-image:      -o-linear-gradient(bottom, #ececec, #f9f9f9);
+			background-image: linear-gradient(to top, #ececec, #f9f9f9);
+			border: 1px solid #CCC;
+			background: #F6F6F6;	
+		}
 		/* Repeatable Fields */		
 		.admin-page-framework-field.repeatable {
 			clear: both;
@@ -4421,6 +4472,104 @@ abstract class AdminPageFramework_Properties_Base {
 			});	
 		";			
 	}
+	
+	/**
+	 * Returns the sortable JavaScript script to be loaded in the head tag of the created admin pages.
+	 * @since			2.1.3
+	 * @var				string
+	 * @static
+	 * @remark			It is accessed from the main class and meta box class.
+	 * @access			public	
+	 * @internal
+	 * @return			string			The image selector script.
+	 */
+	static public function getSortableScript() {
+		
+		/**
+		 * HTML5 Sortable jQuery Plugin
+		 * http://farhadi.ir/projects/html5sortable
+		 * 
+		 * Copyright 2012, Ali Farhadi
+		 * Released under the MIT license.
+		 */
+		return "
+(function($) {
+var dragging, placeholders = $();
+$.fn.sortable = function(options) {
+	var method = String(options);
+	options = $.extend({
+		connectWith: false
+	}, options);
+	return this.each(function() {
+		if (/^enable|disable|destroy$/.test(method)) {
+			var items = $(this).children($(this).data('items')).attr('draggable', method == 'enable');
+			if (method == 'destroy') {
+				items.add(this).removeData('connectWith items')
+					.off('dragstart.h5s dragend.h5s selectstart.h5s dragover.h5s dragenter.h5s drop.h5s');
+			}
+			return;
+		}
+		var isHandle, index, items = $(this).children(options.items);
+		var placeholder = $('<' + (/^ul|ol$/i.test(this.tagName) ? 'li' : 'div') + ' class=\"sortable-placeholder\">');
+		items.find(options.handle).mousedown(function() {
+			isHandle = true;
+		}).mouseup(function() {
+			isHandle = false;
+		});
+		$(this).data('items', options.items)
+		placeholders = placeholders.add(placeholder);
+		if (options.connectWith) {
+			$(options.connectWith).add(this).data('connectWith', options.connectWith);
+		}
+		items.attr('draggable', 'true').on('dragstart.h5s', function(e) {
+			if (options.handle && !isHandle) {
+				return false;
+			}
+			isHandle = false;
+			var dt = e.originalEvent.dataTransfer;
+			dt.effectAllowed = 'move';
+			dt.setData('Text', 'dummy');
+			index = (dragging = $(this)).addClass('sortable-dragging').index();
+		}).on('dragend.h5s', function() {
+			dragging.removeClass('sortable-dragging').show();
+			placeholders.detach();
+			if (index != dragging.index()) {
+				items.parent().trigger('sortupdate', {item: dragging});
+			}
+			dragging = null;
+		}).not('a[href], img').on('selectstart.h5s', function() {
+			this.dragDrop && this.dragDrop();
+			return false;
+		}).end().add([this, placeholder]).on('dragover.h5s dragenter.h5s drop.h5s', function(e) {
+			if (!items.is(dragging) && options.connectWith !== $(dragging).parent().data('connectWith')) {
+				return true;
+			}
+			if (e.type == 'drop') {
+				e.stopPropagation();
+				placeholders.filter(':visible').after(dragging);
+				return false;
+			}
+			e.preventDefault();
+			e.originalEvent.dataTransfer.dropEffect = 'move';
+			if (items.is(this)) {
+				if (options.forcePlaceholderSize) {
+					placeholder.height(dragging.outerHeight());
+				}
+				dragging.hide();
+				$(this)[placeholder.index() < $(this).index() ? 'after' : 'before'](placeholder);
+				placeholders.not(placeholder).detach();
+			} else if (!placeholders.is(this) && !$(this).children(options.items).length) {
+				placeholders.detach();
+				$(this).append(placeholder);
+			}
+			return false;
+		});
+	});
+};
+})(jQuery);";
+		
+	}
+	
 	
 	/**
 	 * Calculates the subtraction of two values with the array key of <em>numOrder</em>
@@ -4616,6 +4765,7 @@ class AdminPageFramework_MetaBox_Properties extends AdminPageFramework_Propertie
 		// 'numOrder' => null,			// do not set the default number here for this key.		
 
 		'fRepeatable'		=> null,	// since 2.1.3		
+		'fSortable'			=> null,	// since 2.1.3		
 	);
 		
 	
@@ -6136,11 +6286,11 @@ class AdminPageFramework_InputField extends AdminPageFramework_Utilities {
 			? "<span style='color:red;'>*&nbsp;{$this->arrField['strError']}" . $this->arrErrors[ $this->arrField['strSectionID'] ][ $this->arrField['strFieldID'] ] . "</span><br />"
 			: '';		
 		
-		// Prepeare the field class selector 
-		$this->strFieldClassSelector = $this->arrField['fRepeatable']
-			? "admin-page-framework-field repeatable"
-			: "admin-page-framework-field";
-			
+		// Prepare the field class selector 
+		$this->strFieldClassSelector = "admin-page-framework-field";
+		$this->strFieldClassSelector .= $this->arrField['fRepeatable'] ? " repeatable" : "";
+		$this->strFieldClassSelector .= $this->arrField['fSortable'] ? " sortable-field" : "";
+					
 		// Get the input field output.
 		switch ( strtolower( $strFieldType ) ) {
 			case in_array( $strFieldType, array( 'text', 'password', 'datetime', 'datetime-local', 'email', 'month', 'search', 'tel', 'time', 'url', 'week' ) ):
@@ -6208,24 +6358,32 @@ class AdminPageFramework_InputField extends AdminPageFramework_Utilities {
 		$strOutput .= $this->arrField['fRepeatable']
 			? $this->getRepeaterScript( $this->strTagID, count( ( array ) $this->vValue ) )
 			: '';
+		
+		// Add the sortable sctip
+		$strOutput .= $this->arrField['fSortable']
+			? $this->getSortableScript( $this->strTagID ) 
+			: '';
 			
-		return "<div class='admin-page-framework-fields'>"
+		$strFieldsClassSelector = 'admin-page-framework-fields';
+		$strFieldsClassSelector .= $this->arrField['fSortable'] ? ' sortable' : '';
+		return "<div class='{$strFieldsClassSelector}'>"
 				. $this->arrField['strBeforeField'] 
 				. $strOutput
 				. $this->arrField['strAfterField']
 			. "</div>";
 		
 	}
+	
 	private function getTextField( $arrOutput=array() ) {
 
-		$arrFields = $this->arrField['fRepeatable'] ? 
+		$arrFields = $this->arrField['fRepeatable'] || $this->arrField['fSortable'] ? 
 			( empty( $this->vValue ) ? array( '' ) : ( array ) $this->vValue )
 			: $this->arrField['vLabel'];
 			
 		foreach( ( array ) $arrFields as $strKey => $strLabel ) 
 			$arrOutput[] = "<div class='{$this->strFieldClassSelector}' id='field-{$this->strTagID}_{$strKey}'>"
 					. $this->getCorrespondingArrayValue( $this->arrField['vBeforeInputTag'], $strKey, '' ) 
-					. ( $strLabel && ! $this->arrField['fRepeatable']
+					. ( $strLabel && ! $this->arrField['fRepeatable'] && ! $this->arrField['fSortable']
 						? "<span class='admin-page-framework-input-label-container' style='min-width:" . $this->getCorrespondingArrayValue( $this->arrField['vLabelMinWidth'], $strKey, self::$arrDefaultFieldValues['vLabelMinWidth'] ) . "px;'>"
 							. "<label for='{$this->strTagID}_{$strKey}' class='text-label'>{$strLabel}</label>"
 						. "</span>" 
@@ -7448,6 +7606,65 @@ class AdminPageFramework_InputField extends AdminPageFramework_Utilities {
 		
 	}
 	
+	/**
+	 * Returns the script for sortable fields.
+	 * @since			2.1.3
+	 */
+	private function getSortableScript( $strTagID ) {
+		
+		return 
+"<script type='text/javascript'>
+	jQuery( document ).ready( function() {
+		jQuery( '.sortable #{$strTagID}' ).sortable(); 
+		jQuery( '.sortable #{$strTagID}' ).sortable().bind( 'sortupdate', function() {
+			
+			// Rename the ids and names 
+			var count = 0;
+			jQuery( this ).children().each( function() {
+					
+				console.log( 'count :' + count );
+				id = jQuery( this ).attr( 'id' );
+				console.log( 'id :' + id );
+				
+				// var index = count;
+				jQuery( this ).attr( 'id', function( index, name ) { return setID( count, name ) } );
+				jQuery( this ).find( 'input,textarea' ).attr( 'id', function( index, name ){ return setID( count, name ) } );
+				jQuery( this ).find( 'input,textarea' ).attr( 'name', function( index, name ){ return setName( count, name ) } );				
+
+				id = jQuery( this ).attr( 'id' );
+				console.log( 'changed id :' + id );
+				
+				count++;
+			});
+			
+			
+		}); 
+		
+		// Helper Closure functions
+		var setID = function( index, name ) {
+			
+			if ( typeof name === 'undefined' ) {
+				return name;
+			}
+			return name.replace( /((\d+)$)/, function ( fullMatch, n ) {
+				return index;
+			});
+			
+		}
+		var setName = function( index, name ) {
+			
+			if ( typeof name === 'undefined' ) {
+				return name;
+			}
+			return name.replace( /([(\d+)])/, function ( fullMatch, n ) {
+				return index;
+			});
+			
+		}		
+	});
+</script>";
+	}
+	
 }
 endif;
 
@@ -8200,6 +8417,7 @@ abstract class AdminPageFramework_MetaBox extends AdminPageFramework_MetaBox_Hel
 			if ( $arrField['strType'] == 'taxonomy' ) $this->addTaxonomyChecklistScript( $arrField );
 			if ( $arrField['strType'] == 'color' ) $this->addColorFieldScript( $arrField );
 			if ( $arrField['strType'] == 'date' ) $this->addDateFieldScript( $arrField );
+			if ( $arrField['fSortable'] ) $this->addSortableField();
 		}
 		
 		// For the contextual help pane,
@@ -8323,6 +8541,23 @@ abstract class AdminPageFramework_MetaBox extends AdminPageFramework_MetaBox_Hel
 		$this->oProps->strScript .= AdminPageFramework_Properties::getImageSelectorScript( "admin_page_framework", $this->oProps->strThickBoxTitle, $this->oProps->strThickBoxButtonUseThis );
 		
 	}
+	
+	/**
+	 * 
+	 * @since			2.1.3
+	 */
+	private function addSortableField() {
+	
+		// This class may be instantiated multiple times so use a global flag.
+		$strRootClassName = get_class();
+		if ( isset( $GLOBALS[ "{$strRootClassName}_SortableScriptAdded" ] ) && $GLOBALS[ "{$strRootClassName}_SortableScriptAdded" ] ) return;
+		$GLOBALS[ "{$strRootClassName}_SortableScriptAdded" ] = true;	
+		
+		// Append the script
+		$this->oProps->strScript .= AdminPageFramework_Properties::getSortableScript();
+
+	}
+	
 
 	/**
 	 * Appends the CSS rules of the framework in the head tag. 
